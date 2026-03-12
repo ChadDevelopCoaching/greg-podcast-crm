@@ -114,7 +114,7 @@ function EmailModal({ podcast, emailType, onClose }) {
       const prompt = isF
         ? `Write a warm professional follow-up email from a podcast booking assistant on behalf of ${GREG_BIO.name}, a ${GREG_BIO.title} based in ${GREG_BIO.location}. Follow-up to ${podcast.host}, host of "${podcast.name}" (${podcast.niche}, ${podcast.region}). We emailed ~1 week ago about Greg being a guest. No reply. Brief, friendly, non-pushy. Reference Greg's expertise: ${GREG_BIO.expertise.slice(0,3).join(", ")}. Format: Subject line first, then body. Under 120 words.`
         : `Write a personalised professional podcast guest pitch email on behalf of ${GREG_BIO.name}, a ${GREG_BIO.title} based in ${GREG_BIO.location}. To ${podcast.host}, host of "${podcast.name}" — ${podcast.niche} podcast, ${podcast.region}, ~${podcast.audience} listeners. Include: warm specific opening referencing their niche; who Greg is (${GREG_BIO.socialProof}); 2-3 topic ideas from: ${GREG_BIO.podcastTopics.join(" | ")}; brief social proof; ${podcast.isHighValue ? `reciprocal offer: invite ${podcast.host} to Greg's podcast (${GREG_BIO.ownPodcastDescription});` : ""} clear low-friction CTA. Tone: confident, warm, peer-to-peer. Format: Subject first, then body. ~200 words.`;
-      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] }) });
+      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":localStorage.getItem("greg-crm-api-key")||"","anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] }) });
       const data = await res.json();
       setEmail(data.content?.map(b=>b.text||"").join("\n")||"");
     } catch { setError("Failed to generate. Please try again."); }
@@ -243,7 +243,7 @@ For EACH podcast found, you MUST do additional web searches to find contact deta
 Return ONLY a JSON array (no markdown, no preamble) where each object has:
 name, host, region ("${cat.region}"), niche ("${cat.niche}"), audience (estimated or "Unknown"), description (1-2 sentences on why it suits a construction business coach guest), email (best email found, or "" if none found), contactUrl (guest pitch page or contact page URL, or ""), contactHint (short plain-English note on how to reach them — e.g. "Guest form on website", "Email found: x@y.com", "LinkedIn DM only", or "No contact found"), isActive (bool — still publishing 2024/2025), fitScore (1-10 fit for Greg: construction coach, AI in construction, scaling SMEs, AU/UK focus).`;
 
-      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, tools:[{type:"web_search_20250305",name:"web_search"}], messages:[{role:"user",content:prompt}] }) });
+      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":localStorage.getItem("greg-crm-api-key")||"","anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, tools:[{type:"web_search_20250305",name:"web_search"}], messages:[{role:"user",content:prompt}] }) });
       const data = await res.json();
       const text = data.content?.map(b=>b.text||"").join("\n")||"[]";
       const arr  = JSON.parse((text.replace(/```json|```/g,"").trim().match(/\[[\s\S]*\]/)||["[]"])[0]);
@@ -265,7 +265,7 @@ For EACH podcast found, do additional web searches to find contact details:
 - Any guest pitch form URL
 
 Return ONLY a JSON array (no markdown) with: name, host, region (country or "Global"), niche, audience, description, email (best email found or ""), contactUrl (guest page URL or ""), contactHint (plain-English note: e.g. "Email found: x@y.com", "Guest form on website", "LinkedIn DM only", or "No contact found"), isActive, fitScore (1-10).`;
-      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, tools:[{type:"web_search_20250305",name:"web_search"}], messages:[{role:"user",content:prompt}] }) });
+      const res  = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json","x-api-key":localStorage.getItem("greg-crm-api-key")||"","anthropic-version":"2023-06-01"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, tools:[{type:"web_search_20250305",name:"web_search"}], messages:[{role:"user",content:prompt}] }) });
       const data = await res.json();
       const text = data.content?.map(b=>b.text||"").join("\n")||"[]";
       const arr  = JSON.parse((text.replace(/```json|```/g,"").trim().match(/\[[\s\S]*\]/)||["[]"])[0]);
@@ -407,6 +407,7 @@ Return ONLY a JSON array (no markdown) with: name, host, region (country or "Glo
 }
 
 const STORAGE_KEY = "greg-crm-podcasts";
+const API_KEY_STORAGE = "greg-crm-api-key";
 
 async function loadPodcasts() {
   try {
@@ -426,7 +427,38 @@ async function savePodcasts(podcasts) {
   }
 }
 
+function ApiKeySetup({ onSave }) {
+  const [val, setVal] = useState("");
+  return (
+    <div style={{minHeight:"100vh",background:"#060d1a",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans','Segoe UI',sans-serif"}}>
+      <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:20,padding:48,width:"100%",maxWidth:480,boxShadow:"0 25px 80px rgba(0,0,0,0.6)"}}>
+        <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,letterSpacing:"0.2em",marginBottom:8}}>SETUP</div>
+        <h1 style={{margin:"0 0 8px",fontSize:24,color:"#f1f5f9",fontFamily:"'DM Serif Display',serif",fontWeight:400}}>Enter your Anthropic API Key</h1>
+        <p style={{margin:"0 0 28px",fontSize:13,color:"#64748b",lineHeight:1.6}}>Your key is saved only in your browser's local storage and never sent anywhere except the Anthropic API.</p>
+        <label style={{display:"block",fontSize:11,color:"#64748b",fontWeight:700,letterSpacing:"0.1em",marginBottom:6}}>API KEY</label>
+        <input
+          type="password"
+          value={val}
+          onChange={e=>setVal(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&val.startsWith("sk-")&&onSave(val)}
+          placeholder="sk-ant-..."
+          style={{...inputStyle,marginBottom:20}}
+        />
+        <button
+          onClick={()=>{ if(val.startsWith("sk-")) onSave(val); }}
+          disabled={!val.startsWith("sk-")}
+          style={{width:"100%",padding:"13px 20px",borderRadius:10,background:val.startsWith("sk-")?"#f59e0b":"#1e293b",color:val.startsWith("sk-")?"#0f172a":"#475569",border:"none",fontWeight:700,fontSize:14,cursor:val.startsWith("sk-")?"pointer":"not-allowed"}}
+        >
+          Save &amp; Continue
+        </button>
+        <p style={{margin:"16px 0 0",fontSize:11,color:"#334155",textAlign:"center"}}>Get your key at console.anthropic.com → API Keys</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [apiKey, setApiKey]             = useState(() => localStorage.getItem(API_KEY_STORAGE) || "");
   const [podcasts, setPodcasts]         = useState(INITIAL_PODCASTS);
   const [storageReady, setStorageReady] = useState(false);
   const [saveStatus, setSaveStatus]     = useState(null); // "saving" | "saved" | "error"
@@ -437,6 +469,13 @@ export default function App() {
   const [emailModal, setEmailModal]     = useState(null);
   const [addModal, setAddModal]         = useState(false);
   const [detailModal, setDetailModal]   = useState(null);
+
+  function saveApiKey(key) {
+    localStorage.setItem(API_KEY_STORAGE, key);
+    setApiKey(key);
+  }
+
+  if (!apiKey) return <ApiKeySetup onSave={saveApiKey} />;
 
   // Load from storage on mount
   useEffect(() => {
@@ -490,6 +529,7 @@ export default function App() {
                   {saveStatus==="error"  && <><span style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>Save failed</>}
                 </div>
               )}
+              <button onClick={()=>{ localStorage.removeItem(API_KEY_STORAGE); setApiKey(""); }} style={{padding:"8px 16px",background:"transparent",color:"#334155",border:"1px solid #1e293b",borderRadius:8,fontWeight:600,fontSize:12,cursor:"pointer"}}>🔑 Change Key</button>
               {tab==="crm" && <button onClick={()=>setAddModal(true)} style={{padding:"12px 24px",background:"#f59e0b",color:"#0f172a",border:"none",borderRadius:10,fontWeight:700,fontSize:14,cursor:"pointer"}}>+ Add Podcast</button>}
             </div>
           </div>
